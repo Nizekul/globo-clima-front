@@ -1,0 +1,86 @@
+﻿@page "/weather"
+@using Microsoft.AspNetCore.Authorization
+@attribute [StreamRendering]
+@attribute [Authorize]
+
+@inject HttpClient HttpClient
+
+<PageTitle>Climas Por Países</PageTitle>
+
+<h1>Weather</h1>
+
+<p>This component demonstrates showing data.</p>
+
+@if (countries == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nome do País</th>
+                <th>Capital</th>
+                <th>Latitude</th>
+                <th>Longitude</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var country in countries)
+            {
+                <tr>
+                    <td>@country.Name.Common</td>
+                    <td>@string.Join(", ", country.Capital)</td>
+                    <td>@string.Join(", ", country.LatLng.Take(1))</td> <!-- Latitude -->
+                    <td>@string.Join(", ", country.LatLng.Skip(1))</td> <!-- Longitude -->
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetCountries();
+    }
+
+    private List<Country>? countries;
+
+    public class Country
+    {
+        public Name Name { get; set; }
+        public List<string> Capital { get; set; }
+        public List<double> LatLng { get; set; }
+    }
+
+    public class Name
+    {
+        public string Common { get; set; }
+        public string Official { get; set; }
+    }
+
+    public async Task GetCountries()
+    {
+        try
+        {
+            var response = await HttpClient.GetAsync("https://localhost:44381/v1/Countries");
+
+            if (response.IsSuccessStatusCode)
+            {
+                countries = await response.Content.ReadFromJsonAsync<List<Country>>();
+            }
+            else
+            {
+                errorMessage = "Erro ao obter dados dos países.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erro: {ex.Message}";
+        }
+    }
+}

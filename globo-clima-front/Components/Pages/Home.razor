@@ -1,0 +1,25 @@
+﻿@page "/"
+
+<PageTitle>Home</PageTitle>
+
+<div class="row">
+    <div class="col-12">
+        <h2 class="fw-bolder">Bem vindo ao <span class="text-danger">Globo Clima</span></h2>
+    </div>
+    <div class="col-12">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <AuthorizeView>
+                        <NotAuthorized>
+                            <span> É preciso fazer o login antes de obter acesso a página. Por favor <a class="fw-bolder" href="/Account/Login">Clique aqui</a> para fazer login:</span>
+                        </NotAuthorized>
+                        <Authorized>
+                            <span>Bem vindo! <b>@context.User.Identity.Name</b>. <a class="fw-bolder" href="/Account/Logout"> Clique aqui</a> para sair.</span>
+                        </Authorized>
+                    </AuthorizeView>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
