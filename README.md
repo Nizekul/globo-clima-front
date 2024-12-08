@@ -19,7 +19,7 @@ Este é o frontend para a aplicação de favoritos, desenvolvido com Blazor Serv
    - Se ainda não tiver, instale o .NET SDK na sua máquina: [Instalar .NET](https://dotnet.microsoft.com/download/dotnet).
 
 2. **Configuração**:
-   - O frontend está configurado para se comunicar com a API: [Api publica](https://github.com/Nizekul/globo-clima).
+   - O frontend está configurado para se comunicar com a API: [Api publica](https://github.com/Nizekul/globo-clima) ou no appsettings apontar para a api que esta comentada, porém no futuro esse Ip será desligado.
    - Certifique-se de que a API esteja rodando antes de executar o frontend.
 
 ### Rodando o Projeto
