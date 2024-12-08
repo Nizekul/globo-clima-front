@@ -7,6 +7,7 @@
 @inject HttpClient HttpClient
 @inject IConfiguration Configuration
 @rendermode InteractiveServer
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Favoritos</PageTitle>
 
@@ -107,8 +108,11 @@
     {
         try
         {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var userIdClaim = authState.User.FindFirst("UserId")?.Value;
+
             var baseUrl = Configuration["Envs:BaseUrl"];
-            var response = await HttpClient.GetAsync($"{baseUrl}/Favorites");
+            var response = await HttpClient.GetAsync($"{baseUrl}/Favorites?userID={Guid.Parse(userIdClaim)}");
 
             if (response.IsSuccessStatusCode)
             {
