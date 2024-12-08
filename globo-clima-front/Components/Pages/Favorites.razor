@@ -77,9 +77,13 @@
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        await GetFavorites();
+        if (firstRender)
+        {
+            await GetFavorites();
+            UpdatePaginatedFavorites();
+        }
     }
 
     public class Favorite
@@ -94,12 +98,12 @@
     }
 
     private List<Favorite>? favorites;
-    private List<Favorite> PaginatedFavorites => favorites.Skip(CurrentPage * ItemsPerPage).Take(ItemsPerPage).ToList();
+    private List<Favorite> PaginatedFavorites = new();
 
     private int ItemsPerPage = 10;
     private int CurrentPage = 0;
 
-    private int TotalPages => (int)Math.Ceiling(favorites.Count / (double)ItemsPerPage);
+    private int TotalPages => (int)Math.Ceiling((favorites?.Count ?? 0) / (double)ItemsPerPage);
 
     private bool CanGoPrevious => CurrentPage > 0;
     private bool CanGoNext => CurrentPage < TotalPages - 1;
@@ -169,11 +173,25 @@
         }
     }
 
+    private void UpdatePaginatedFavorites()
+    {
+        if (favorites != null)
+        {
+            PaginatedFavorites = favorites
+                .Skip(CurrentPage * ItemsPerPage)
+                .Take(ItemsPerPage)
+                .ToList();
+
+            StateHasChanged();
+        }
+    }
+
     private void NextPage()
     {
         if (CanGoNext)
         {
             CurrentPage++;
+            UpdatePaginatedFavorites();
         }
     }
 
@@ -182,6 +200,7 @@
         if (CanGoPrevious)
         {
             CurrentPage--;
+            UpdatePaginatedFavorites();
         }
     }
 
