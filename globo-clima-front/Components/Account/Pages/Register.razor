@@ -1,53 +1,71 @@
-﻿@* @page "/Account/Register"
+﻿@page "/Account/Register"
 
 @using System.ComponentModel.DataAnnotations
 @using System.Text
 @using System.Text.Encodings.Web
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.WebUtilities
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
 @using globo_clima_front.Data
+@using System.Security.Claims
 
+@inject HttpClient HttpClient
+@inject ILogger<Login> Logger
 @inject UserManager<ApplicationUser> UserManager
 @inject IUserStore<ApplicationUser> UserStore
 @inject SignInManager<ApplicationUser> SignInManager
-@inject IEmailSender<ApplicationUser> EmailSender
 @inject ILogger<Register> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
+@inject IConfiguration Configuration
+@rendermode InteractiveServer
 
-<PageTitle>Register</PageTitle>
 
-<h1>Register</h1>
+<PageTitle>Cadastrar</PageTitle>
+
+<h1>Registre-se</h1>
 
 <div class="row">
-    <div class="col-md-4">
-        <StatusMessage Message="@Message" />
+    <div class="col-lg-4 offset-lg-4 pt-4 pb-4 border">
         <EditForm Model="Input" asp-route-returnUrl="@ReturnUrl" method="post" OnValidSubmit="RegisterUser" FormName="register">
             <DataAnnotationsValidator />
-            <h2>Create a new account.</h2>
-            <hr />
-            <ValidationSummary class="text-danger" role="alert" />
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
-                <label for="email">Email</label>
+            <div class="mb-3 text-center flex-column">
+                <img src="/images/avatar.png" style="max-height:5rem;" />
+                <h3>Bem-vindo! Vamos criar sua nova conta!</h3>
+            </div>
+            <div class="mb-3 text-center">
+                <label>Nome</label>
+                <InputText @bind-Value="Input.Name" class="form-control" placeholder="Digite seu Nome..." />
+                <ValidationMessage For="() => Input.Name" class="text-danger" />
+            </div>
+            <div class="mb-3 text-center">
+                <label>Email</label>
+                <InputText @bind-Value="Input.Email" class="form-control" placeholder="Digite seu email..." />
                 <ValidationMessage For="() => Input.Email" class="text-danger" />
             </div>
-            <div class="form-floating mb-3">
-                <InputText type="password" @bind-Value="Input.Password" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
-                <label for="password">Password</label>
+            <div class="mb-3 text-center">
+                <label>Senha</label>
+                <InputText @bind-Value="Input.Password" class="form-control" placeholder="Digite sua senha..." type="password" />
                 <ValidationMessage For="() => Input.Password" class="text-danger" />
             </div>
-            <div class="form-floating mb-3">
-                <InputText type="password" @bind-Value="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" placeholder="password" />
-                <label for="confirm-password">Confirm Password</label>
+            <div class="mb-3 text-center">
+                <label>Confirmar Senha</label>
+                <InputText @bind-Value="Input.ConfirmPassword" class="form-control" placeholder="Confirme sua senha..." type="password" />
                 <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
             </div>
-            <button type="submit" class="w-100 btn btn-lg btn-primary">Register</button>
+            <div class="mb-3 d-grid gap-2">
+                <button type="submit" class="btn btn-primary">Cadastrar</button>
+            </div>
         </EditForm>
     </div>
 </div>
+<Toasts class="p-3" AutoHide="true" Delay="4000" Placement="ToastsPlacement.TopRight" />
 
 @code {
+
+    [Inject] protected ToastService ToastService { get; set; } = default!;
+
     private IEnumerable<IdentityError>? identityErrors;
 
     [SupplyParameterFromForm]
@@ -56,43 +74,65 @@
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
-    private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
+    public class UserModel
+    {
+        public string Name { get; set; }
+        public string Email { get; set; }
+        public string Senha { get; set; }
+    }
 
     public async Task RegisterUser(EditContext editContext)
     {
         var user = CreateUser();
-
-        await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
         var emailStore = GetEmailStore();
-        await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
-        var result = await UserManager.CreateAsync(user, Input.Password);
 
-        if (!result.Succeeded)
+
+        var baseUrl = Configuration["Envs:BaseUrl"];
+        var url = $"{baseUrl}/Users";
+        var userImputs = new UserModel
+            {
+                Name = Input.Name,
+                Email = Input.Email,
+                Senha = Input.Password,
+            };
+
+        var response = await HttpClient.PostAsJsonAsync(url, userImputs);
+
+
+        if (response.IsSuccessStatusCode)
         {
-            identityErrors = result.Errors;
-            return;
+            ToastService.Notify(new(ToastType.Success, "Cadastrado", $"{DateTime.Now}", "Usuário cadastrado com sucesso!"));
+            NavigationManager.NavigateTo("/Account/Login");
+        }
+        else if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+            ToastService.Notify(new(ToastType.Danger, "Cadastro", $"{DateTime.Now}", $"Erro: {error?.Message}"));
+        }
+        else if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+        {
+            var error = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+            ToastService.Notify(new(ToastType.Danger, "Cadastro", $"{DateTime.Now}", $"Erro: {error?.Message}"));
+        }
+        else
+        {
+            ToastService.Notify(new(ToastType.Danger, "Cadastro", $"{DateTime.Now}", "Houve um erro ao fazer o cadastro, tente novamente mais tarde!"));
         }
 
-        Logger.LogInformation("User created a new account with password.");
+    }
 
-        var userId = await UserManager.GetUserIdAsync(user);
-        var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
-        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-        var callbackUrl = NavigationManager.GetUriWithQueryParameters(
-            NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
-            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code, ["returnUrl"] = ReturnUrl });
+    public class ErrorResponse
+    {
+        public string Message { get; set; }
+    }
 
-        await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
-
-        if (UserManager.Options.SignIn.RequireConfirmedAccount)
+    private IUserEmailStore<ApplicationUser> GetEmailStore()
+    {
+        if (!UserManager.SupportsUserEmail)
         {
-            RedirectManager.RedirectTo(
-                "Account/RegisterConfirmation",
-                new() { ["email"] = Input.Email, ["returnUrl"] = ReturnUrl });
+            throw new NotSupportedException("É necessario um e-mail convencional, Ex: user@email.com");
         }
-
-        await SignInManager.SignInAsync(user, isPersistent: false);
-        RedirectManager.RedirectTo(ReturnUrl);
+        return (IUserEmailStore<ApplicationUser>)UserStore;
     }
 
     private ApplicationUser CreateUser()
@@ -103,37 +143,33 @@
         }
         catch
         {
-            throw new InvalidOperationException($"Can't create an instance of '{nameof(ApplicationUser)}'. " +
-                $"Ensure that '{nameof(ApplicationUser)}' is not an abstract class and has a parameterless constructor.");
+            throw new InvalidOperationException($"Não é possível criar uma instacia do '{nameof(ApplicationUser)}'. " +
+                $"Confirme se '{nameof(ApplicationUser)}' não esta com erros e verifique os parametros.");
         }
-    }
-
-    private IUserEmailStore<ApplicationUser> GetEmailStore()
-    {
-        if (!UserManager.SupportsUserEmail)
-        {
-            throw new NotSupportedException("The default UI requires a user store with email support.");
-        }
-        return (IUserEmailStore<ApplicationUser>)UserStore;
     }
 
     private sealed class InputModel
     {
+        [Required]
+        [StringLength(100, ErrorMessage = "O {0} deve ter no mínimo {2} e no máximo {1} cracteres.", MinimumLength = 3)]
+        [Display(Name = "Name")]
+        public string Name { get; set; } = "";
+
         [Required]
         [EmailAddress]
         [Display(Name = "Email")]
         public string Email { get; set; } = "";
 
         [Required]
-        [StringLength(100, ErrorMessage = "The {0} must be at least {2} and at max {1} characters long.", MinimumLength = 6)]
+        [StringLength(100, ErrorMessage = "O {0} deve ter no mínimo {2} e no máximo {1} cracteres.", MinimumLength = 6)]
         [DataType(DataType.Password)]
         [Display(Name = "Password")]
         public string Password { get; set; } = "";
 
+        [Required]
         [DataType(DataType.Password)]
-        [Display(Name = "Confirm password")]
-        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
+        [Display(Name = "Confirme sua senha")]
+        [Compare("Password", ErrorMessage = "A senhas precisam ser a mesma, verifique e tente novamente.")]
         public string ConfirmPassword { get; set; } = "";
     }
 }
- *@

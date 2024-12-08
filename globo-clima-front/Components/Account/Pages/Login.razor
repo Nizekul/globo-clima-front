@@ -21,7 +21,7 @@
             </div>
             <div class="mb-3 text-center">
                 <label>User Name</label>
-                <InputText @bind-Value="Input.Email" class="form-control" placeholder="Username" />
+                <InputText @bind-Value="Input.Email" class="form-control" placeholder="Digite seu email" />
                 <ValidationMessage For="() => Input.Email" class="text-danger" />
             </div>
             <div class="mb-3 text-center">
@@ -38,8 +38,11 @@
         </EditForm>
     </div>
 </div>
+<Toasts class="p-3" AutoHide="true" Delay="4000" Placement="ToastsPlacement.TopRight" />
 
 @code {
+    [Inject] protected ToastService ToastService { get; set; } = default!;
+
     private string? errorMessage;
 
     [CascadingParameter]
@@ -59,42 +62,57 @@
         }
     }
 
+
     public async Task LoginUser()
     {
         var loginData = new
         {
-            Username = Input.Email,
-            Password = Input.Password,
+            username = Input.Email,
+            password = Input.Password,
         };
+
         var baseUrl = Configuration["Envs:BaseUrl"];
         var response = await HttpClient.PostAsJsonAsync($"{baseUrl}/Auth", loginData);
 
         if (response.IsSuccessStatusCode)
         {
-            var claims = new List<Claim>
+            var responseData = await response.Content.ReadFromJsonAsync<JwtResponse>();
+
+            if (responseData != null)
             {
-                new Claim(ClaimTypes.Name, Input.Email),
-                new Claim(ClaimTypes.Email, Input.Email),
-            };
 
-            var indentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            var principal = new ClaimsPrincipal(indentity);
+                var claims = new List<Claim>
+                {
+                    new Claim(ClaimTypes.Name, responseData.name),
+                    new Claim("UserId", responseData.id.ToString())
+                };
 
-            await HttpContext.SignInAsync(principal);
+                var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                var principal = new ClaimsPrincipal(identity);
 
-            navigationManager.NavigateTo("/");
+                await HttpContext.SignInAsync(principal);
 
-            Logger.LogInformation("User logged in.");
-            RedirectManager.RedirectTo(ReturnUrl);
+                navigationManager.NavigateTo("/");
+
+                ToastService.Notify(new(ToastType.Success, "Login", $"{DateTime.Now}", "Usuário logado com Sucesso!"));
+                Logger.LogInformation("User logged in successfully.");
+                RedirectManager.RedirectTo(ReturnUrl);
+            }
         }
         else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
         {
-            errorMessage = "Senha ou Usuário invalido!";
+            errorMessage = "Senha ou Usuário inválido!";
         }
         else
         {
             errorMessage = "Tente novamente mais tarde.";
         }
+    }
+
+    public class JwtResponse
+    {
+        public string name { get; set; }
+        public Guid id { get; set; }
     }
 
     private sealed class InputModel
@@ -106,8 +124,5 @@
         [Required]
         [DataType(DataType.Password)]
         public string Password { get; set; } = "";
-
-        [Display(Name = "Remember me?")]
-        public bool RememberMe { get; set; }
     }
 }
