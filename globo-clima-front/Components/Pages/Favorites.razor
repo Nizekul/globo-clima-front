@@ -1,11 +1,11 @@
 ﻿@page "/Favorites"
-@using System.Text.Json
-@using System.Text
-@using globo_clima_front.Components.Account
 
+@using System.Text.Json
+@using Microsoft.AspNetCore.Authorization
+
+@attribute [Authorize]
 @inject HttpClient HttpClient
-@inject NavigationManager navigationManager
-@inject IdentityRedirectManager RedirectManager
+@inject IConfiguration Configuration
 @rendermode InteractiveServer
 
 <PageTitle>Favoritos</PageTitle>
@@ -13,7 +13,7 @@
 <div class="container mt-4">
     <div class="row mb-3">
         <div class="col-12">
-            <h2 class="fw-bolder text-danger">Favoritos</h2>
+            <h2 class="fw-bolder text-dark">Favoritos</h2>
             <p class="text-muted">Aqui você pode ver e gerenciar seus favoritos salvos.</p>
         </div>
     </div>
@@ -63,8 +63,11 @@
         }
     </div>
 </div>
+<Toasts class="p-3" AutoHide="true" Delay="4000" Placement="ToastsPlacement.TopRight" />
 
 @code {
+    [Inject] protected ToastService ToastService { get; set; } = default!;
+
     private string? errorMessage;
 
     [CascadingParameter]
@@ -104,7 +107,8 @@
     {
         try
         {
-            var response = await HttpClient.GetAsync("https://localhost:44381/v1/Favorites");
+            var baseUrl = Configuration["Envs:BaseUrl"];
+            var response = await HttpClient.GetAsync($"{baseUrl}/Favorites");
 
             if (response.IsSuccessStatusCode)
             {
@@ -125,7 +129,8 @@
     {
         try
         {
-            var url = $"https://localhost:44381/v1/Favorites?favoriteID={favoriteId}&userID={userId}";
+            var baseUrl = Configuration["Envs:BaseUrl"];
+            var url = $"{baseUrl}/Favorites?favoriteID={favoriteId}&userID={userId}";
             var response = await HttpClient.DeleteAsync(url);
 
             if (response.IsSuccessStatusCode)
@@ -135,10 +140,11 @@
                 {
                     favorites?.Remove(favoriteToRemove);
                 }
+                ToastService.Notify(new(ToastType.Success, "Favoritos", $"{DateTime.Now}", "Favorito Removido com Sucesso!"));
             }
             else
             {
-                errorMessage = "Erro ao remover favorito.";
+                ToastService.Notify(new(ToastType.Warning, "Favoritos", $"{DateTime.Now}", "Erro ao tentar remover, tente mais tarde!"));
             }
         }
         catch (Exception ex)

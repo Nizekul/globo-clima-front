@@ -3,15 +3,13 @@
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Authentication.Cookies
-@using Microsoft.AspNetCore.Identity
 @using System.Security.Claims
-@using globo_clima_front.Data
 
-@inject SignInManager<ApplicationUser> SignInManager
 @inject ILogger<Login> Logger
 @inject NavigationManager navigationManager
 @inject IdentityRedirectManager RedirectManager
 @inject HttpClient HttpClient
+@inject IConfiguration Configuration
 
 <div class="row">
     <div class="col-lg-4 offset-lg-4 pt-4 pb-4 border">
@@ -68,8 +66,8 @@
             Username = Input.Email,
             Password = Input.Password,
         };
-
-        var response = await HttpClient.PostAsJsonAsync("https://localhost:44381/v1/Auth", loginData);
+        var baseUrl = Configuration["Envs:BaseUrl"];
+        var response = await HttpClient.PostAsJsonAsync($"{baseUrl}/Auth", loginData);
 
         if (response.IsSuccessStatusCode)
         {
@@ -84,8 +82,7 @@
 
             await HttpContext.SignInAsync(principal);
 
-            navigationManager.NavigateTo("/"); 
-
+            navigationManager.NavigateTo("/");
 
             Logger.LogInformation("User logged in.");
             RedirectManager.RedirectTo(ReturnUrl);

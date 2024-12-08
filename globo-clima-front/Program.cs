@@ -1,3 +1,6 @@
+using BlazorBootstrap;
+using Blazorise;
+using Blazorise.Bootstrap5;
 using globo_clima_front.Components;
 using globo_clima_front.Components.Account;
 using globo_clima_front.Data;
@@ -16,7 +19,16 @@ builder.Services.AddScoped<IdentityUserAccessor>();
 builder.Services.AddScoped<IdentityRedirectManager>();
 builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri("https://localhost:44381/") });
+builder.Services.AddSingleton<IConfiguration>(builder.Configuration);
+builder.Services.AddSingleton<ToastService>();
 
+builder.Services.AddBlazorise(options =>
+{
+    options.Immediate = true;
+})
+.AddBootstrap5Providers();
+
+builder.Services.AddBlazorBootstrap();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
@@ -39,8 +51,6 @@ builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.Requ
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
-
-builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
 var app = builder.Build();
 
@@ -65,8 +75,5 @@ app.UseAuthorization();
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
-
-// Add additional endpoints required by the Identity /Account Razor components.
-app.MapAdditionalIdentityEndpoints();
 
 app.Run();

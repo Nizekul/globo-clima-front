@@ -1,60 +1,92 @@
 ﻿@page "/weather"
 @using Microsoft.AspNetCore.Authorization
+
 @attribute [StreamRendering]
 @attribute [Authorize]
 
 @inject HttpClient HttpClient
+@inject IConfiguration _configuration
+@rendermode InteractiveServer
 
 <PageTitle>Climas Por Países</PageTitle>
 
-<h1>Weather</h1>
-
-<p>This component demonstrates showing data.</p>
-
-@if (countries == null)
-{
-    <p><em>Loading...</em></p>
-}
-else
-{
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Nome do País</th>
-                <th>Capital</th>
-                <th>Latitude</th>
-                <th>Longitude</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var country in countries)
-            {
-                <tr>
-                    <td>@country.Name.Common</td>
-                    <td>@string.Join(", ", country.Capital)</td>
-                    <td>@string.Join(", ", country.LatLng.Take(1))</td> <!-- Latitude -->
-                    <td>@string.Join(", ", country.LatLng.Skip(1))</td> <!-- Longitude -->
-                </tr>
-            }
-        </tbody>
-    </table>
-}
+<div class="container mt-4">
+    <div class="row mb-3">
+        <div class="col-12">
+            <h2 class="fw-bolder text-dark">Climas por Países</h2>
+            <p class="navbar-text">Aqui você pode ver e adicionar novos favoritos.</p>
+        </div>
+    </div>
+    <div class="col-12">
+        @if (countries == null || countries.Count == 0)
+        {
+            <div class="alert alert-info">
+                <em>Não há Países disponiveis....</em>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Nome do País</th>
+                            <th>Capital</th>
+                            <th>Temp. (°C)</th>
+                            <th>Temp. (°F)</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var country in PaginatedCountries)
+                        {
+                            <tr>
+                                <td>@country.Name.Common</td>
+                                <td>@string.Join(", ", country.Capital)</td>
+                                <td>@country.temp_c</td>
+                                <td>@country.temp_f</td>
+                                <td>
+                                    <button class="btn btn-sm btn-success" @onclick="@(async () => await AddFavorite(@country.Capital, @country.LatLng))">
+                                        Favoritar ★
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <div class="d-flex justify-content-between align-items-center">
+                <button class="btn btn-secondary" @onclick="PreviousPage" disabled="@(!CanGoPrevious)">Anterior</button>
+                <span>Pagina @(CurrentPage + 1) de @TotalPages</span>
+                <button class="btn btn-secondary" @onclick="NextPage" disabled="@(!CanGoNext)">Próxima</button>
+            </div>
+        }
+    </div>
+</div>
+<Toasts class="p-3" AutoHide="true" Delay="4000" Placement="ToastsPlacement.TopRight" />
 
 @code {
+    [Inject] protected ToastService ToastService { get; set; } = default!;
+
     private string? errorMessage;
-
-    protected override async Task OnInitializedAsync()
-    {
-        await GetCountries();
-    }
-
     private List<Country>? countries;
+    private List<Country> PaginatedCountries = new();
+
+    private int ItemsPerPage = 10;
+    private int CurrentPage = 0;
+
+    private int TotalPages => (int)Math.Ceiling((countries?.Count ?? 0) / (double)ItemsPerPage);
+
+    private bool CanGoPrevious => CurrentPage > 0;
+    private bool CanGoNext => CurrentPage < TotalPages - 1 && countries != null && countries.Count > 0;
 
     public class Country
     {
         public Name Name { get; set; }
         public List<string> Capital { get; set; }
         public List<double> LatLng { get; set; }
+        public string temp_c { get; set; }
+        public string temp_f { get; set; }
     }
 
     public class Name
@@ -63,11 +95,26 @@ else
         public string Official { get; set; }
     }
 
+    public class FavoritesModel
+    {
+        public string City { get; set; }
+        public string Lat { get; set; }
+        public string Lon { get; set; }
+        public Guid UserId { get; set; }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetCountries();
+        UpdatePaginatedCountries();
+    }
+
     public async Task GetCountries()
     {
         try
         {
-            var response = await HttpClient.GetAsync("https://localhost:44381/v1/Countries");
+            var baseUrl = _configuration["Envs:BaseUrl"];
+            var response = await HttpClient.GetAsync($"{baseUrl}/Countries");
 
             if (response.IsSuccessStatusCode)
             {
@@ -81,6 +128,68 @@ else
         catch (Exception ex)
         {
             errorMessage = $"Erro: {ex.Message}";
+        }
+    }
+
+    public async Task AddFavorite(List<string> Capital, List<double> LatLng)
+    {
+        try
+        {
+            var baseUrl = _configuration["Envs:BaseUrl"];
+            var url = $"{baseUrl}/Favorites";
+
+            var favorite = new FavoritesModel
+                {
+                    City = string.Join(", ", Capital),
+                    Lat = LatLng[0].ToString(),
+                    Lon = LatLng[1].ToString()
+                };
+
+            var response = await HttpClient.PostAsJsonAsync(url, favorite);
+
+            if (response.IsSuccessStatusCode)
+            {
+                ToastService.Notify(new(ToastType.Success, "Favoritos", $"{DateTime.Now}", "Favorito adicionado com Sucesso!"));
+            }
+            else
+            {
+                ToastService.Notify(new(ToastType.Warning, "Favoritos", $"{DateTime.Now}", "Você já adicionou este favorito!"));
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erro: {ex.Message}";
+        }
+    }
+
+    private void UpdatePaginatedCountries()
+    {
+        if (countries != null)
+        {
+            PaginatedCountries = countries
+                .Skip(CurrentPage * ItemsPerPage)
+                .Take(ItemsPerPage)
+                .ToList();
+
+            StateHasChanged();
+        }
+    }
+
+    private void NextPage()
+    {
+        if (CanGoNext)
+        {
+            CurrentPage++;
+            UpdatePaginatedCountries();
+        }
+    }
+
+    private void PreviousPage()
+    {
+        if (CanGoPrevious)
+        {
+            CurrentPage--;
+            UpdatePaginatedCountries();
         }
     }
 }
