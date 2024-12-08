@@ -1,5 +1,5 @@
 
-# Frontend - Aplicação de Favoritos 🌡️☀️🌦️⛈️🌪️
+# Frontend - Aplicação de Favoritar o clima do seus Países preferidos! 🌡️☀️🌦️⛈️🌪️
 
 Este é o frontend para a aplicação de favoritos, desenvolvido com Blazor Server. Ele permite que os usuários visualizem, adicionem e removam favoritos, bem como obtenham informações climáticas para os locais favoritos.
 
